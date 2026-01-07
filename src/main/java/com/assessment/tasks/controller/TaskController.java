@@ -2,31 +2,59 @@ package com.assessment.tasks.controller;
 
 import com.assessment.tasks.dto.*;
 import com.assessment.tasks.exception.TaskNotFoundException;
+import com.assessment.tasks.model.IdempotencyRecord;
 import com.assessment.tasks.model.Task;
+import com.assessment.tasks.service.IdempotencyService;
 import com.assessment.tasks.service.TaskService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/tasks")
 public class TaskController {
 
     private final TaskService taskService;
+    private final IdempotencyService idempotencyService;
+    private final ObjectMapper objectMapper;
 
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, IdempotencyService idempotencyService, ObjectMapper objectMapper) {
         this.taskService = taskService;
+        this.idempotencyService = idempotencyService;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping
     public ResponseEntity<TaskResponse> create(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @Valid @RequestBody CreateTaskRequest request) {
+            @Valid @RequestBody CreateTaskRequest request) throws Exception {
 
-        // TODO: Handle idempotency in next step
+        if (idempotencyKey != null && !idempotencyKey.isEmpty()) {
+            if (idempotencyKey.length() > 255) {
+                throw new IllegalArgumentException("Idempotency-Key must not exceed 255 characters");
+            }
+
+            String payloadHash = idempotencyService.hashPayload(request);
+            Optional<IdempotencyRecord> existing = idempotencyService.find(idempotencyKey);
+
+            if (existing.isPresent()) {
+                idempotencyService.validate(idempotencyKey, payloadHash);
+                TaskResponse cached = objectMapper.readValue(existing.get().getResponse(), TaskResponse.class);
+                return ResponseEntity.status(HttpStatus.CREATED).body(cached);
+            }
+
+            Task task = taskService.create(request);
+            TaskResponse response = new TaskResponse(task);
+            String responseJson = objectMapper.writeValueAsString(response);
+            idempotencyService.save(idempotencyKey, payloadHash, responseJson);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        }
+
         Task task = taskService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(new TaskResponse(task));
     }
