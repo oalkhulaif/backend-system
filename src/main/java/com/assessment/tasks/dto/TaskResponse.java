@@ -12,6 +12,9 @@ public class TaskResponse {
     private Instant createdAt;
     private Instant updatedAt;
 
+    public TaskResponse() {
+    }
+
     public TaskResponse(Task task) {
         this.id = task.getId();
         this.title = task.getTitle();
@@ -21,10 +24,27 @@ public class TaskResponse {
         this.updatedAt = task.getUpdatedAt();
     }
 
-    public Long getId() { return id; }
-    public String getTitle() { return title; }
-    public String getStatus() { return status; }
-    public Integer getPriority() { return priority; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
+    public Long getId() {
+        return id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public Integer getPriority() {
+        return priority;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
 }
